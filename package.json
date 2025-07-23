@@ -1,0 +1,20 @@
+{
+  "name": "ticketing-system-drive",
+  "version": "1.0.0",
+  "description": "Ticketing system automation with Google Drive integration",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "fastify": "^4.24.3",
+    "@fastify/cors": "^8.4.0",
+    "@notionhq/client": "^2.2.13",
+    "googleapis": "^128.0.0",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
