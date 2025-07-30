@@ -16,7 +16,7 @@ fastify.get("/health", async (request, reply) => {
 });
 
 // Notion webhook endpoint
-ffastify.post("/webhook/notion", async (request, reply) => {
+fastify.post("/webhook/notion", async (request, reply) => {
   try {
     const payload = request.body;
 
