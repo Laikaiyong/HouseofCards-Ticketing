@@ -39,7 +39,7 @@ class TicketAutomationService {
       try {
         await this.notionService.updatePageProperty(
           pageId,
-          "Drive Delivery Folder", // Adjust property name as needed
+          "Delivery", // Adjust property name as needed
           folderResult.deliveryFolderLink
         );
       } catch (updateError) {

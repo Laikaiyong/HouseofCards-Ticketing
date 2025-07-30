@@ -1,4 +1,4 @@
-const { Client } = require('@notionhq/client');
+const { Client } = require("@notionhq/client");
 
 class NotionService {
   constructor() {
@@ -13,25 +13,24 @@ class NotionService {
       const response = await this.notion.pages.retrieve({
         page_id: pageId,
       });
-      
+
       return this.extractTicketData(response);
     } catch (error) {
-      console.error('Error fetching page details:', error);
+      console.error("Error fetching page details:", error);
       throw error;
     }
   }
 
   extractTicketData(page) {
     const properties = page.properties;
-    
+
     // Extract relevant data - adjust property names based on your Notion database schema
     const ticketData = {
       id: page.id,
-      status: this.getPropertyValue(properties.Status || properties.status),
-      requestType: this.getPropertyValue(properties['Request Type'] || properties.requestType || properties.type),
-      date: this.getPropertyValue(properties.Date || properties.date || properties.created),
-      title: this.getPropertyValue(properties.Name || properties.Title || properties.title),
-      // Add more fields as needed based on your database schema
+      status: this.getPropertyValue(properties.Status),
+      requestType: this.getPropertyValue(properties["Request Type"]),
+      date: this.getPropertyValue(properties["Due Date"]),
+      title: this.getPropertyValue(properties["Ticket ID"]),
     };
 
     // Use current date if no date is specified
@@ -46,25 +45,27 @@ class NotionService {
     if (!property) return null;
 
     switch (property.type) {
-      case 'title':
+      case "title":
         return property.title?.[0]?.plain_text || null;
-      case 'rich_text':
+      case "rich_text":
         return property.rich_text?.[0]?.plain_text || null;
-      case 'select':
+      case "select":
         return property.select?.name || null;
-      case 'multi_select':
-        return property.multi_select?.map(item => item.name).join(', ') || null;
-      case 'date':
+      case "multi_select":
+        return (
+          property.multi_select?.map((item) => item.name).join(", ") || null
+        );
+      case "date":
         return property.date?.start || null;
-      case 'number':
+      case "number":
         return property.number;
-      case 'checkbox':
+      case "checkbox":
         return property.checkbox;
-      case 'url':
+      case "url":
         return property.url;
-      case 'email':
+      case "email":
         return property.email;
-      case 'phone_number':
+      case "phone_number":
         return property.phone_number;
       default:
         return null;
@@ -75,7 +76,7 @@ class NotionService {
     try {
       const updateData = {
         page_id: pageId,
-        properties: {}
+        properties: {},
       };
 
       // Set the property based on type - this is a simple text/rich_text update
@@ -83,16 +84,16 @@ class NotionService {
         rich_text: [
           {
             text: {
-              content: value
-            }
-          }
-        ]
+              content: value,
+            },
+          },
+        ],
       };
 
       await this.notion.pages.update(updateData);
       console.log(`Updated page ${pageId} with ${propertyName}: ${value}`);
     } catch (error) {
-      console.error('Error updating page property:', error);
+      console.error("Error updating page property:", error);
       throw error;
     }
   }
