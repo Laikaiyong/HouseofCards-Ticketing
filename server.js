@@ -3,9 +3,9 @@ const fastify = require("fastify")({ logger: true });
 const TicketAutomationService = require("./services/ticketAutomationService");
 
 // Register CORS plugin
-fastify.register(require("@fastify/cors"), {
-  origin: true,
-});
+// fastify.register(require("@fastify/cors"), {
+//   origin: true,
+// });
 
 // Initialize services
 const ticketAutomationService = new TicketAutomationService();
@@ -15,10 +15,17 @@ fastify.get("/health", async (request, reply) => {
   return { status: "ok", timestamp: new Date().toISOString() };
 });
 
+fastify.addHook("preHandler", (request, reply, done) => {
+  // if (request.body) {
+  //   request.log.info({ body: request.body }, "parsed body");
+  // }
+  done();
+});
+
 // Notion webhook endpoint
 fastify.post("/webhook/notion", async (request, reply) => {
   try {
-    const payload = request.body;
+    const payload = request.body; // Use request.body directly
 
     // Log the incoming webhook for debugging
     fastify.log.info(
@@ -27,15 +34,25 @@ fastify.post("/webhook/notion", async (request, reply) => {
     );
 
     // Extract pageId and status from the webhook payload
-    const pageId = payload.page?.id;
-    // Try to get status from properties (adjust as needed for your Notion schema)
-    const statusProperty =
-      payload.properties?.Status || payload.properties?.status;
+    const pageId = payload.data?.id;
+    const statusProperty = payload.data?.properties?.["Status (FOR CBP ONLY)"];
+    fastify.log.info({ statusProperty }, "Extracted status property");
+
     let status = null;
     if (statusProperty) {
       if (statusProperty.type === "select" && statusProperty.select) {
         status = statusProperty.select.name;
+      } else if (statusProperty.type === "status" && statusProperty.status) {
+        status = statusProperty.status.name;
       }
+    }
+    fastify.log.info({ pageId, status }, "Extracted pageId and status");
+
+    if (!pageId || !status) {
+      return reply.code(400).send({
+        success: false,
+        message: "pageId and status are required in webhook payload",
+      });
     }
 
     if (!pageId || !status) {

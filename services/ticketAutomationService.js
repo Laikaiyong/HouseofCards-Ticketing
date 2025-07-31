@@ -10,22 +10,15 @@ class TicketAutomationService {
   async processStatusChange(pageId, newStatus) {
     try {
       console.log(
-        `Processing status change for page ${pageId} to ${newStatus}`
+        `Processing status change for page ${pageId} to ${newStatus}`,
       );
-
-      if (newStatus !== "Active") {
-        return {
-          success: true,
-          message: "Status change does not trigger automation",
-        };
-      }
 
       // Get ticket details from Notion
       const ticketData = await this.notionService.getPageDetails(pageId);
 
       // Validate required data
       if (!ticketData.requestType) throw new Error("Request Type is required");
-      if (!ticketData.id) throw new Error("Ticket ID is required");
+      if (!ticketData.title) throw new Error("Ticket ID is required");
 
       // Use new folder structure
       const folderResult =
@@ -33,19 +26,20 @@ class TicketAutomationService {
           date: ticketData.date,
           requestType: ticketData.requestType,
           ticketId: ticketData.id,
+          title: ticketData.title,
         });
 
       // Update Notion with the 07_Delivery folder link
       try {
         await this.notionService.updatePageProperty(
           pageId,
-          "Delivery", // Adjust property name as needed
-          folderResult.deliveryFolderLink
+          "Project Folder", // Adjust property name as needed
+          folderResult.deliveryFolderLink,
         );
       } catch (updateError) {
         console.warn(
           "Could not update Notion page with delivery folder link:",
-          updateError.message
+          updateError.message,
         );
       }
 

@@ -1,4 +1,5 @@
 const { google } = require("googleapis");
+const { JWT } = require("google-auth-library");
 
 class GoogleDriveService {
   constructor() {
@@ -7,23 +8,59 @@ class GoogleDriveService {
     this.initializeAuth();
   }
 
-  initializeAuth() {
+  async initializeAuth() {
     try {
-      const credentials = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_CREDS);
-      const auth = new google.auth.GoogleAuth({
-        credentials,
+      const credsRaw = process.env.GOOGLE_SERVICE_ACCOUNT_CREDS;
+      if (!credsRaw) {
+        throw new Error("GOOGLE_SERVICE_ACCOUNT_CREDS env var is missing");
+      }
+      const credentials = JSON.parse(credsRaw);
+      if (!credentials.client_email) {
+        throw new Error("Service account JSON missing client_email");
+      }
+      const auth = new JWT({
+        email: credentials.client_email,
+        key: credentials.private_key,
         scopes: ["https://www.googleapis.com/auth/drive"],
       });
 
       this.drive = google.drive({ version: "v3", auth });
+      console.log(
+        `[GoogleDriveService] Using service account: ${credentials.client_email}`
+      );
+      await this.listAllFiles();
     } catch (error) {
       console.error("Failed to initialize Google Drive auth:", error);
       throw error;
     }
   }
 
+  async listAllFiles() {
+    try {
+      const res = await this.drive.files.list({
+        q: "trashed=false",
+        fields: "files(id, name, parents)",
+        pageSize: 1000,
+      });
+      console.log(
+        "[GoogleDriveService] All visible files:",
+        res.data.files.filter(
+          (item) =>
+            Array.isArray(item.parents) &&
+            item.parents[0] == process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID
+        )
+      );
+      return res.data.files;
+    } catch (error) {
+      console.error("[GoogleDriveService] Error listing all files:", error);
+      throw error;
+    }
+  }
   async findOrCreateFolder(name, parentId) {
     try {
+      console.log(
+        `[GoogleDriveService] Searching for folder "${name}" in parent "${parentId}"`
+      );
       // Search for existing folder
       const searchResponse = await this.drive.files.list({
         q: `name='${name}' and parents in '${parentId}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
@@ -31,10 +68,16 @@ class GoogleDriveService {
       });
 
       if (searchResponse.data.files.length > 0) {
+        console.log(
+          `[GoogleDriveService] Found existing folder "${name}" (${searchResponse.data.files[0].id})`
+        );
         return searchResponse.data.files[0].id;
       }
 
       // Create new folder if not found
+      console.log(
+        `[GoogleDriveService] Creating folder "${name}" in parent "${parentId}"`
+      );
       const createResponse = await this.drive.files.create({
         requestBody: {
           name: name,
@@ -44,8 +87,20 @@ class GoogleDriveService {
         fields: "id",
       });
 
+      console.log(
+        `[GoogleDriveService] Created folder "${name}" (${createResponse.data.id})`
+      );
       return createResponse.data.id;
     } catch (error) {
+      if (
+        error.errors &&
+        error.errors[0] &&
+        error.errors[0].reason === "notFound"
+      ) {
+        console.error(
+          `[GoogleDriveService] Folder not found or no access. Make sure the parent folder (${parentId}) is shared with your service account email.`
+        );
+      }
       console.error(`Error finding/creating folder ${name}:`, error);
       throw error;
     }
@@ -85,64 +140,9 @@ class GoogleDriveService {
     return Math.ceil(month / 3);
   }
 
-  async createTicketFolderStructure(ticketData) {
-    try {
-      const { date, requestType } = ticketData;
-      const ticketDate = new Date(date);
-      const year = ticketDate.getFullYear().toString();
-      const quarter = `Q${this.getQuarter(ticketDate)}`;
-
-      console.log(
-        `Creating folder structure for: ${year}/${quarter}/${requestType}`
-      );
-
-      // Create/find year folder
-      const yearFolderId = await this.findOrCreateFolder(
-        year,
-        this.parentFolderId
-      );
-      console.log(`Year folder ID: ${yearFolderId}`);
-
-      // Create/find quarter folder
-      const quarterFolderId = await this.findOrCreateFolder(
-        quarter,
-        yearFolderId
-      );
-      console.log(`Quarter folder ID: ${quarterFolderId}`);
-
-      // Get next ticket number for this request type
-      const ticketNumber = await this.getNextTicketNumber(
-        requestType,
-        quarterFolderId
-      );
-
-      // Create ticket folder with format: 00_[Request Type]
-      const ticketFolderName = `${ticketNumber}_${requestType}`;
-      const ticketFolderId = await this.findOrCreateFolder(
-        ticketFolderName,
-        quarterFolderId
-      );
-
-      console.log(
-        `Created ticket folder: ${ticketFolderName} (ID: ${ticketFolderId})`
-      );
-
-      return {
-        yearFolderId,
-        quarterFolderId,
-        ticketFolderId,
-        ticketFolderName,
-        folderPath: `${year}/${quarter}/${ticketFolderName}`,
-      };
-    } catch (error) {
-      console.error("Error creating ticket folder structure:", error);
-      throw error;
-    }
-  }
-
   async createTicketFolderStructureV2(ticketData) {
     try {
-      const { date, requestType, ticketId } = ticketData;
+      const { date, requestType, title, ticketId } = ticketData;
       const ticketDate = new Date(date);
       const year = ticketDate.getFullYear().toString();
       const quarter = `Q${this.getQuarter(ticketDate)}`;
@@ -160,10 +160,10 @@ class GoogleDriveService {
       );
 
       // 3. Ticket ID folder (from Notion)
-      if (!ticketId)
+      if (!title)
         throw new Error("ticketId is required for folder structure");
       const ticketIdFolderId = await this.findOrCreateFolder(
-        ticketId,
+        title,
         quarterFolderId
       );
 

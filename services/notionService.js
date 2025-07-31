@@ -27,7 +27,7 @@ class NotionService {
     // Extract relevant data - adjust property names based on your Notion database schema
     const ticketData = {
       id: page.id,
-      status: this.getPropertyValue(properties.Status),
+      status: this.getPropertyValue(properties["Status (FOR CBP ONLY)"]),
       requestType: this.getPropertyValue(properties["Request Type"]),
       date: this.getPropertyValue(properties["Due Date"]),
       title: this.getPropertyValue(properties["Ticket ID"]),
@@ -47,6 +47,8 @@ class NotionService {
     switch (property.type) {
       case "title":
         return property.title?.[0]?.plain_text || null;
+      case "formula":
+        return property.formula?.string || null;
       case "rich_text":
         return property.rich_text?.[0]?.plain_text || null;
       case "select":
@@ -79,16 +81,23 @@ class NotionService {
         properties: {},
       };
 
-      // Set the property based on type - this is a simple text/rich_text update
-      updateData.properties[propertyName] = {
-        rich_text: [
-          {
-            text: {
-              content: value,
+      // Detect if the property is a URL field
+      if (propertyName === "Project Folder") {
+        updateData.properties[propertyName] = {
+          url: value,
+        };
+      } else {
+        // Default to rich_text for other fields
+        updateData.properties[propertyName] = {
+          rich_text: [
+            {
+              text: {
+                content: value,
+              },
             },
-          },
-        ],
-      };
+          ],
+        };
+      }
 
       await this.notion.pages.update(updateData);
       console.log(`Updated page ${pageId} with ${propertyName}: ${value}`);
