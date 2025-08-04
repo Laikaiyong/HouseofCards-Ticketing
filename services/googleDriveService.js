@@ -140,6 +140,28 @@ class GoogleDriveService {
     return Math.ceil(month / 3);
   }
 
+  async setFolderPermissions(folderId, role = 'reader', type = 'anyone') {
+    try {
+      console.log(`[GoogleDriveService] Setting permissions for folder ${folderId} to ${role} for ${type}`);
+      
+      const permission = {
+        role: role,
+        type: type,
+      };
+
+      const response = await this.drive.permissions.create({
+        fileId: folderId,
+        requestBody: permission,
+      });
+
+      console.log(`[GoogleDriveService] Successfully set permissions for folder ${folderId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`[GoogleDriveService] Error setting permissions for folder ${folderId}:`, error);
+      throw error;
+    }
+  }
+
   async createTicketFolderStructureV2(ticketData) {
     try {
       const { date, requestType, title, ticketId } = ticketData;
@@ -200,6 +222,8 @@ class GoogleDriveService {
         const subId = await this.findOrCreateFolder(folderName, typeFolderId);
         if (folderName === "07_Delivery") {
           deliveryFolderId = subId;
+          // Set permissions for delivery folder to be accessible by anyone with the link
+          await this.setFolderPermissions(subId, 'reader', 'anyone');
           deliveryFolderLink = `https://drive.google.com/drive/folders/${subId}`;
         }
       }
