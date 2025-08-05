@@ -140,7 +140,7 @@ class GoogleDriveService {
     return Math.ceil(month / 3);
   }
 
-  async setFolderPermissions(folderId, role = 'reader', type = 'anyone') {
+  async setFolderPermissions(folderId, role = 'writer', type = 'anyone') {
     try {
       console.log(`[GoogleDriveService] Setting permissions for folder ${folderId} to ${role} for ${type}`);
       
@@ -223,7 +223,7 @@ class GoogleDriveService {
         if (folderName === "07_Delivery") {
           deliveryFolderId = subId;
           // Set permissions for delivery folder to be accessible by anyone with the link
-          await this.setFolderPermissions(subId, 'reader', 'anyone');
+          await this.setFolderPermissions(subId, 'writer', 'anyone');
           deliveryFolderLink = `https://drive.google.com/drive/folders/${subId}`;
         }
       }
